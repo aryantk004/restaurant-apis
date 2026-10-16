@@ -7,7 +7,7 @@ using RestaurantManagement.Infrastructure.Persistence;
 using RestaurantManagement.Infrastructure.Repositories;
 using RestaurantManagement.Infrastructure.Caching;
 
-var builder = WebApplication.CreateBuilder(args);
+var builder = WebApplication.CreateBuilder(args); // config logging DI setup
 
 // Register API controllers
 builder.Services.AddControllers();

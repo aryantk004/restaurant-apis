@@ -15,6 +15,15 @@ public class SqlRestaurantRepository : IRestaurantRepository
         _context = context;
     }
 
+    public async Task<List<Restaurant>> GetAllAsync(
+    CancellationToken cancellationToken = default)
+    {
+        return await _context.Restaurants
+            .AsNoTracking()
+            .OrderBy(r => r.Id)
+            .ToListAsync(cancellationToken);
+    }
+
     // GET restaurant by ID
     public async Task<Restaurant?> GetByIdAsync(
         long id,

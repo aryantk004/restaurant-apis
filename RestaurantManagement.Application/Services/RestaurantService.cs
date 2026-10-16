@@ -22,6 +22,17 @@ public class RestaurantService : IRestaurantService
         _logger = logger;
     }
 
+    public async Task<List<RestaurantResponse>> GetAllAsync(
+    CancellationToken cancellationToken = default)
+    {
+        var restaurants = await _repository.GetAllAsync(
+            cancellationToken);
+
+        return restaurants
+            .Select(r => ToResponse(r))
+            .ToList();
+    }
+
     // GET /api/restaurants/{id}
     public async Task<RestaurantResponse?> GetByIdAsync(
         long id,

@@ -16,10 +16,15 @@ public class RestaurantsController : ControllerBase
         _restaurantService = restaurantService;
     }
 
-    [HttpGet("test-error")]
-    public IActionResult TestError()
+    // GET /api/restaurants
+    [HttpGet]
+    public async Task<ActionResult<List<RestaurantResponse>>> GetAll(
+        CancellationToken cancellationToken)
     {
-        throw new Exception("Simulated server failure");
+        var restaurants = await _restaurantService.GetAllAsync(
+            cancellationToken);
+
+        return Ok(restaurants);
     }
 
     // GET /api/restaurants/{id}

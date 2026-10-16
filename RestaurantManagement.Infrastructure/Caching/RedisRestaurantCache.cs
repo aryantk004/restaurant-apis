@@ -14,9 +14,9 @@ public class RedisRestaurantCache : IRestaurantCache
         TimeSpan.FromMinutes(5);
 
     public RedisRestaurantCache(
-        IConnectionMultiplexer redis)
+        IConnectionMultiplexer redis) // redis connection manager shared
     {
-        _database = redis.GetDatabase();
+        _database = redis.GetDatabase(); // IDatabase object to run commands on
     }
 
     public async Task<RestaurantResponse?> GetAsync(long id)

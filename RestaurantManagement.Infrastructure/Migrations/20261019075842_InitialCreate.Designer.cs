@@ -12,8 +12,8 @@ using RestaurantManagement.Infrastructure.Persistence;
 namespace RestaurantManagement.Infrastructure.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20261015061946_AddRestaurantRowVersion")]
-    partial class AddRestaurantRowVersion
+    [Migration("20261019075842_InitialCreate")]
+    partial class InitialCreate
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -64,20 +64,21 @@ namespace RestaurantManagement.Infrastructure.Migrations
                         .HasMaxLength(150)
                         .HasColumnType("nvarchar(150)");
 
-                    b.Property<byte[]>("RowVersion")
-                        .IsConcurrencyToken()
-                        .IsRequired()
-                        .ValueGeneratedOnAddOrUpdate()
-                        .HasColumnType("rowversion");
-
                     b.Property<DateTime?>("UpdatedAtUtc")
                         .HasColumnType("datetime2");
 
                     b.HasKey("Id");
 
-                    b.HasIndex("City", "Area");
+                    b.ToTable("Restaurants", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_Restaurants_Area_NotBlank", "LEN(LTRIM(RTRIM([Area]))) > 0");
 
-                    b.ToTable("Restaurants", (string)null);
+                            t.HasCheckConstraint("CK_Restaurants_City_NotBlank", "LEN(LTRIM(RTRIM([City]))) > 0");
+
+                            t.HasCheckConstraint("CK_Restaurants_DeliveryTime", "[DeliveryTimeMinutes] BETWEEN 1 AND 180");
+
+                            t.HasCheckConstraint("CK_Restaurants_Name_NotBlank", "LEN(LTRIM(RTRIM([Name]))) > 0");
+                        });
                 });
 #pragma warning restore 612, 618
         }

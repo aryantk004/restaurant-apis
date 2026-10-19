@@ -22,16 +22,33 @@ public class RestaurantService : IRestaurantService
         _logger = logger;
     }
 
-    public async Task<List<RestaurantResponse>> GetAllAsync(
-    CancellationToken cancellationToken = default)
+
+    public async Task<PaginatedResponse<RestaurantResponse>> GetAllAsync(
+        int page,
+        int pageSize,
+        CancellationToken cancellationToken = default)
     {
-        var restaurants = await _repository.GetAllAsync(
+        // Fetch paginated restaurants and total count from MSSQL
+        var (restaurants, totalCount) = await _repository.GetAllAsync(
+            page,
+            pageSize,
             cancellationToken);
 
-        return restaurants
+        // Convert database entities to response DTOs
+        var items = restaurants
             .Select(r => ToResponse(r))
             .ToList();
+
+        // Return paginated response
+        return new PaginatedResponse<RestaurantResponse>
+        {
+            Items = items,
+            Page = page,
+            PageSize = pageSize,
+            TotalCount = totalCount
+        };
     }
+
 
     // GET /api/restaurants/{id}
     public async Task<RestaurantResponse?> GetByIdAsync(

@@ -7,6 +7,8 @@ using RestaurantManagement.Infrastructure.Persistence;
 using RestaurantManagement.Infrastructure.Repositories;
 using RestaurantManagement.Infrastructure.Caching;
 using RestaurantManagement.Api.Exceptions;
+using Microsoft.AspNetCore.RateLimiting;
+using System.Threading.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(args); // config logging DI setup
 
@@ -29,6 +31,36 @@ builder.Services.AddSingleton<IConnectionMultiplexer>(sp =>
     return ConnectionMultiplexer.Connect(connectionString);
 });
 
+
+// Configure API rate limiting
+builder.Services.AddRateLimiter(options =>
+{
+    // Return HTTP 429 when the limit is exceeded
+    options.RejectionStatusCode =
+        StatusCodes.Status429TooManyRequests;
+
+    // Apply the limit to every API request
+    options.GlobalLimiter =
+        PartitionedRateLimiter.Create<HttpContext, string>(
+            context =>
+            {
+                // Identify the client by IP address
+                var clientIp = context.Connection.RemoteIpAddress?
+                    .ToString() ?? "unknown";
+
+                return RateLimitPartition.GetFixedWindowLimiter(
+                    partitionKey: clientIp,
+                    factory: _ => new FixedWindowRateLimiterOptions
+                    {
+                        PermitLimit = 5,
+                        Window = TimeSpan.FromMinutes(1),
+                        QueueLimit = 0,
+                        AutoReplenishment = true
+                    });
+            });
+});
+
+
 builder.Services.AddScoped<
     IRestaurantCache,
     RedisRestaurantCache>();
@@ -43,17 +75,18 @@ builder.Services.AddScoped<
     IRestaurantService,
     RestaurantService>();
 
-builder.Services.AddProblemDetails();
+builder.Services.AddProblemDetails(); // Standardised error response (like status codes etc.)
 
-builder.Services.AddProblemDetails();
-
-builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
+builder.Services.AddExceptionHandler<GlobalExceptionHandler>(); // Custom exception handler registered
 
 var app = builder.Build();
 
-app.UseExceptionHandler();
+app.UseExceptionHandler(); // Enables exception middleware
 
 app.UseHttpsRedirection();
+
+// Enable rate limiting middleware
+app.UseRateLimiter();
 
 app.MapControllers();
 

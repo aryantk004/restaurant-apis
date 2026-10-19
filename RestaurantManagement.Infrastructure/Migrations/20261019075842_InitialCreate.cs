@@ -30,12 +30,11 @@ namespace RestaurantManagement.Infrastructure.Migrations
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_Restaurants", x => x.Id);
+                    table.CheckConstraint("CK_Restaurants_Area_NotBlank", "LEN(LTRIM(RTRIM([Area]))) > 0");
+                    table.CheckConstraint("CK_Restaurants_City_NotBlank", "LEN(LTRIM(RTRIM([City]))) > 0");
+                    table.CheckConstraint("CK_Restaurants_DeliveryTime", "[DeliveryTimeMinutes] BETWEEN 1 AND 180");
+                    table.CheckConstraint("CK_Restaurants_Name_NotBlank", "LEN(LTRIM(RTRIM([Name]))) > 0");
                 });
-
-            migrationBuilder.CreateIndex(
-                name: "IX_Restaurants_City_Area",
-                table: "Restaurants",
-                columns: new[] { "City", "Area" });
         }
 
         /// <inheritdoc />

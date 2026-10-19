@@ -55,9 +55,6 @@ public class RestaurantConfiguration : IEntityTypeConfiguration<Restaurant>
         builder.Property(r => r.UpdatedAtUtc)
             .IsRequired(false);
 
-        // Index for common restaurant searches
-        builder.HasIndex(r => new { r.City, r.Area });
-
         // Exclude soft-deleted restaurants by default
         builder.HasQueryFilter(r => !r.IsDeleted);
 

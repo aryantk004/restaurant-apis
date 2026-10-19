@@ -2,6 +2,7 @@
 using Microsoft.AspNetCore.Mvc;
 using RestaurantManagement.Application.DTOs;
 using RestaurantManagement.Application.Interfaces;
+using System.ComponentModel.DataAnnotations;
 
 namespace RestaurantManagement.Api.Controllers;
 
@@ -16,16 +17,21 @@ public class RestaurantsController : ControllerBase
         _restaurantService = restaurantService;
     }
 
-    // GET /api/restaurants
+    // GET /api/restaurants?page=1&pageSize=10
     [HttpGet]
-    public async Task<ActionResult<List<RestaurantResponse>>> GetAll(
-        CancellationToken cancellationToken)
+    public async Task<ActionResult<PaginatedResponse<RestaurantResponse>>> GetAll(
+        [FromQuery, Range(1, int.MaxValue)] int page = 1, // default - 1
+        [FromQuery, Range(1, 100)] int pageSize = 10, // default - 10
+        CancellationToken cancellationToken = default)
     {
-        var restaurants = await _restaurantService.GetAllAsync(
+        var result = await _restaurantService.GetAllAsync(
+            page,
+            pageSize,
             cancellationToken);
 
-        return Ok(restaurants);
+        return Ok(result);
     }
+
 
     // GET /api/restaurants/{id}
     [HttpGet("{id:long}")] // Method Route

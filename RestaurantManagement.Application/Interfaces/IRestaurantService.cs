@@ -5,7 +5,9 @@ namespace RestaurantManagement.Application.Interfaces;
 
 public interface IRestaurantService
 {
-    Task<List<RestaurantResponse>> GetAllAsync(
+    Task<PaginatedResponse<RestaurantResponse>> GetAllAsync(
+    int page,
+    int pageSize,
     CancellationToken cancellationToken = default);
 
     Task<RestaurantResponse?> GetByIdAsync(

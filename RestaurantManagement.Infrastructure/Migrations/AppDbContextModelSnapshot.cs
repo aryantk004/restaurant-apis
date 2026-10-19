@@ -66,8 +66,6 @@ namespace RestaurantManagement.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("City", "Area");
-
                     b.ToTable("Restaurants", null, t =>
                         {
                             t.HasCheckConstraint("CK_Restaurants_Area_NotBlank", "LEN(LTRIM(RTRIM([Area]))) > 0");

@@ -15,14 +15,29 @@ public class SqlRestaurantRepository : IRestaurantRepository
         _context = context;
     }
 
-    public async Task<List<Restaurant>> GetAllAsync(
-    CancellationToken cancellationToken = default)
+
+    public async Task<(List<Restaurant> Items, int TotalCount)> GetAllAsync(
+        int page,
+        int pageSize,
+        CancellationToken cancellationToken = default)
     {
-        return await _context.Restaurants
-            .AsNoTracking()
+        // Query Restaurants table.
+        // The global query filter excludes soft-deleted restaurants.
+        var query = _context.Restaurants.AsNoTracking();
+
+        // Count all matching restaurants before pagination.
+        var totalCount = await query.CountAsync(cancellationToken);
+
+        // Retrieve only restaurants belonging to the requested page.
+        var restaurants = await query
             .OrderBy(r => r.Id)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
             .ToListAsync(cancellationToken);
+
+        return (restaurants, totalCount);
     }
+
 
     // GET restaurant by ID
     public async Task<Restaurant?> GetByIdAsync(

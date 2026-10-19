@@ -4,7 +4,9 @@ namespace RestaurantManagement.Application.Interfaces;
 
 public interface IRestaurantRepository
 {
-    Task<List<Restaurant>> GetAllAsync(
+    Task<(List<Restaurant> Items, int TotalCount)> GetAllAsync(
+    int page,
+    int pageSize,
     CancellationToken cancellationToken = default);
 
     Task<Restaurant?> GetByIdAsync(

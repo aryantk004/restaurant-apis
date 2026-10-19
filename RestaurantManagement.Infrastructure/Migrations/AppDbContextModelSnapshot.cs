@@ -68,7 +68,16 @@ namespace RestaurantManagement.Infrastructure.Migrations
 
                     b.HasIndex("City", "Area");
 
-                    b.ToTable("Restaurants", (string)null);
+                    b.ToTable("Restaurants", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_Restaurants_Area_NotBlank", "LEN(LTRIM(RTRIM([Area]))) > 0");
+
+                            t.HasCheckConstraint("CK_Restaurants_City_NotBlank", "LEN(LTRIM(RTRIM([City]))) > 0");
+
+                            t.HasCheckConstraint("CK_Restaurants_DeliveryTime", "[DeliveryTimeMinutes] BETWEEN 1 AND 180");
+
+                            t.HasCheckConstraint("CK_Restaurants_Name_NotBlank", "LEN(LTRIM(RTRIM([Name]))) > 0");
+                        });
                 });
 #pragma warning restore 612, 618
         }

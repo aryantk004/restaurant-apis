@@ -1,4 +1,4 @@
-﻿// EF Core mapping to MSSQL
+﻿
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using RestaurantManagement.Domain.Entities;
@@ -7,7 +7,7 @@ namespace RestaurantManagement.Infrastructure.Persistence.Configurations;
 
 public class RestaurantConfiguration : IEntityTypeConfiguration<Restaurant>
 {
-    public void Configure(EntityTypeBuilder<Restaurant> builder) // builder is an object provided by EF Core that lets you configure the database mapping for Restaurant
+    public void Configure(EntityTypeBuilder<Restaurant> builder)
     {
         // Database table name
         builder.ToTable("Restaurants");
@@ -60,5 +60,29 @@ public class RestaurantConfiguration : IEntityTypeConfiguration<Restaurant>
 
         // Exclude soft-deleted restaurants by default
         builder.HasQueryFilter(r => !r.IsDeleted);
+
+        // Database-level check constraints
+        builder.ToTable(t =>
+        {
+            // Restaurant name cannot contain only spaces
+            t.HasCheckConstraint(
+                "CK_Restaurants_Name_NotBlank",
+                "LEN(LTRIM(RTRIM([Name]))) > 0");
+
+            // City cannot contain only spaces
+            t.HasCheckConstraint(
+                "CK_Restaurants_City_NotBlank",
+                "LEN(LTRIM(RTRIM([City]))) > 0");
+
+            // Area cannot contain only spaces
+            t.HasCheckConstraint(
+                "CK_Restaurants_Area_NotBlank",
+                "LEN(LTRIM(RTRIM([Area]))) > 0");
+
+            // Delivery time must be between 1 and 180 minutes
+            t.HasCheckConstraint(
+                "CK_Restaurants_DeliveryTime",
+                "[DeliveryTimeMinutes] BETWEEN 1 AND 180");
+        });
     }
 }

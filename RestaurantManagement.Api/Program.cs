@@ -6,6 +6,7 @@ using RestaurantManagement.Application.Services;
 using RestaurantManagement.Infrastructure.Persistence;
 using RestaurantManagement.Infrastructure.Repositories;
 using RestaurantManagement.Infrastructure.Caching;
+using RestaurantManagement.Api.Exceptions;
 
 var builder = WebApplication.CreateBuilder(args); // config logging DI setup
 
@@ -44,31 +45,9 @@ builder.Services.AddScoped<
 
 builder.Services.AddProblemDetails();
 
-builder.Services.AddExceptionHandler(options =>
-{
-    options.ExceptionHandler = async context =>
-    {
-        var logger = context.RequestServices
-            .GetRequiredService<ILogger<Program>>();
+builder.Services.AddProblemDetails();
 
-        var exception = context.Features
-            .Get<Microsoft.AspNetCore.Diagnostics
-                .IExceptionHandlerFeature>()?.Error;
-
-        logger.LogError(
-            exception,
-            "Unhandled exception occurred");
-
-        context.Response.StatusCode =
-            StatusCodes.Status500InternalServerError;
-
-        await Results.Problem(
-            statusCode: 500,
-            title: "Internal Server Error",
-            detail: "An unexpected error occurred."
-        ).ExecuteAsync(context);
-    };
-});
+builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
 
 var app = builder.Build();
 

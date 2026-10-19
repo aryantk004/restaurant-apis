@@ -22,7 +22,7 @@ public class RestaurantService : IRestaurantService
         _logger = logger;
     }
 
-
+    // GET /api/restaurants?page=1&pageSize=10
     public async Task<PaginatedResponse<RestaurantResponse>> GetAllAsync(
         int page,
         int pageSize,
@@ -39,7 +39,14 @@ public class RestaurantService : IRestaurantService
             .Select(r => ToResponse(r))
             .ToList();
 
-        // Return paginated response
+        // Log pagination result
+        _logger.LogDebug(
+            "Retrieved restaurant page {Page}, page size {PageSize}, returned {ReturnedCount} of {TotalCount} restaurants",
+            page,
+            pageSize,
+            items.Count,
+            totalCount);
+
         return new PaginatedResponse<RestaurantResponse>
         {
             Items = items,
@@ -49,59 +56,77 @@ public class RestaurantService : IRestaurantService
         };
     }
 
-
     // GET /api/restaurants/{id}
     public async Task<RestaurantResponse?> GetByIdAsync(
         long id,
         CancellationToken cancellationToken = default)
     {
-        // Step 1: Check Redis FIRST.
+        // Step 1: Check Redis first
         try
         {
             var cached = await _cache.GetAsync(id);
 
             if (cached != null)
             {
-                _logger.LogInformation(
-                    "Cache HIT for restaurant {Id}", id);
+                _logger.LogDebug(
+                    "Redis cache HIT for restaurant {RestaurantId}",
+                    id);
 
                 return cached;
             }
 
-            _logger.LogInformation(
-                "Cache MISS for restaurant {Id}", id);
+            _logger.LogDebug(
+                "Redis cache MISS for restaurant {RestaurantId}",
+                id);
         }
-        catch (Exception ex)
+        catch (Exception ex) when (
+            ex is not OperationCanceledException)
         {
+            // Redis failure should not block MSSQL reads
             _logger.LogWarning(
                 ex,
-                "Redis read failed for restaurant {Id}", id);
+                "Redis read failed for restaurant {RestaurantId}. Falling back to MSSQL",
+                id);
         }
 
-        // Step 2: Cache miss - fetch from MSSQL.
+        // Step 2: Fetch from MSSQL
         var restaurant = await _repository.GetByIdAsync(
-            id, cancellationToken);
+            id,
+            cancellationToken);
 
         if (restaurant == null || restaurant.IsDeleted)
         {
+            _logger.LogDebug(
+                "Restaurant {RestaurantId} not found in MSSQL",
+                id);
+
             return null;
         }
 
+        _logger.LogDebug(
+            "Restaurant {RestaurantId} retrieved from MSSQL",
+            id);
+
         var response = ToResponse(restaurant);
 
-        // Step 3: Store the result in Redis.
+        // Step 3: Populate Redis cache
         try
         {
             await _cache.SetAsync(response);
+
+            _logger.LogDebug(
+                "Restaurant {RestaurantId} stored in Redis cache",
+                id);
         }
-        catch (Exception ex)
+        catch (Exception ex) when (
+            ex is not OperationCanceledException)
         {
             _logger.LogWarning(
                 ex,
-                "Redis write failed for restaurant {Id}", id);
+                "Redis write failed for restaurant {RestaurantId}",
+                id);
         }
 
-        // Step 4: Return the restaurant.
         return response;
     }
 
@@ -124,10 +149,17 @@ public class RestaurantService : IRestaurantService
             CreatedAtUtc = DateTime.UtcNow
         };
 
+        // Save to MSSQL
         await _repository.AddAsync(
-            restaurant, cancellationToken);
+            restaurant,
+            cancellationToken);
 
-        // Lazy caching: the first GET populates Redis.
+        // Log only after successful database save
+        _logger.LogInformation(
+            "Restaurant {RestaurantId} created successfully",
+            restaurant.Id);
+
+        // Lazy caching: first GET populates Redis
         return ToResponse(restaurant);
     }
 
@@ -138,10 +170,15 @@ public class RestaurantService : IRestaurantService
         CancellationToken cancellationToken = default)
     {
         var restaurant = await _repository.GetByIdAsync(
-            id, cancellationToken);
+            id,
+            cancellationToken);
 
         if (restaurant == null || restaurant.IsDeleted)
         {
+            _logger.LogDebug(
+                "Update requested for nonexistent restaurant {RestaurantId}",
+                id);
+
             return null;
         }
 
@@ -162,23 +199,30 @@ public class RestaurantService : IRestaurantService
 
         restaurant.UpdatedAtUtc = DateTime.UtcNow;
 
-        // Step 1: Update MSSQL.
+        // Step 1: Update MSSQL
         await _repository.UpdateAsync(
-            restaurant, cancellationToken);
+            restaurant,
+            cancellationToken);
 
-        // Step 2: Invalidate Redis.
+        _logger.LogInformation(
+            "Restaurant {RestaurantId} updated successfully in MSSQL",
+            id);
+
+        // Step 2: Invalidate Redis
         try
         {
             await _cache.RemoveAsync(id);
 
-            _logger.LogInformation(
-                "Cache invalidated for restaurant {Id}", id);
+            _logger.LogDebug(
+                "Redis cache invalidated for restaurant {RestaurantId}",
+                id);
         }
-        catch (Exception ex)
+        catch (Exception ex) when (
+            ex is not OperationCanceledException)
         {
             _logger.LogWarning(
                 ex,
-                "Redis invalidation failed after updating restaurant {Id}",
+                "Redis invalidation failed after updating restaurant {RestaurantId}",
                 id);
         }
 
@@ -191,43 +235,54 @@ public class RestaurantService : IRestaurantService
         CancellationToken cancellationToken = default)
     {
         var restaurant = await _repository.GetByIdAsync(
-            id, cancellationToken);
+            id,
+            cancellationToken);
 
         if (restaurant == null || restaurant.IsDeleted)
         {
+            _logger.LogDebug(
+                "Delete requested for nonexistent restaurant {RestaurantId}",
+                id);
+
             return false;
         }
 
-        // Soft delete: preserve the SQL row.
+        // Soft delete: preserve the SQL row
         restaurant.IsDeleted = true;
         restaurant.IsActive = false;
         restaurant.UpdatedAtUtc = DateTime.UtcNow;
 
-        // Step 1: Save soft deletion in MSSQL.
+        // Step 1: Save soft deletion in MSSQL
         await _repository.DeleteAsync(
-            restaurant, cancellationToken);
+            restaurant,
+            cancellationToken);
 
-        // Step 2: Invalidate Redis.
+        _logger.LogInformation(
+            "Restaurant {RestaurantId} soft deleted successfully",
+            id);
+
+        // Step 2: Invalidate Redis
         try
         {
             await _cache.RemoveAsync(id);
 
-            _logger.LogInformation(
-                "Cache invalidated after deleting restaurant {Id}",
+            _logger.LogDebug(
+                "Redis cache invalidated after deleting restaurant {RestaurantId}",
                 id);
         }
-        catch (Exception ex)
+        catch (Exception ex) when (
+            ex is not OperationCanceledException)
         {
             _logger.LogWarning(
                 ex,
-                "Redis invalidation failed after deleting restaurant {Id}",
+                "Redis invalidation failed after deleting restaurant {RestaurantId}",
                 id);
         }
 
         return true;
     }
 
-    // Convert database entity to API response DTO.
+    // Convert database entity to API response DTO
     private static RestaurantResponse ToResponse(
         Restaurant restaurant)
     {

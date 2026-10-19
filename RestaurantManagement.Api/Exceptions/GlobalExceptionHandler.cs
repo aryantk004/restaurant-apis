@@ -46,19 +46,31 @@ public class GlobalExceptionHandler : IExceptionHandler
                 break;
         }
 
+        var method = httpContext.Request.Method;
+        var path = httpContext.Request.Path;
+        var traceId = httpContext.TraceIdentifier;
+
+        // Log server errors as Error
         if (statusCode >= 500)
         {
             _logger.LogError(
                 exception,
-                "Request failed with status {StatusCode}",
-                statusCode);
+                "Request {Method} {Path} failed with status {StatusCode}. TraceId: {TraceId}",
+                method,
+                path,
+                statusCode,
+                traceId);
         }
         else
         {
+            // Log client errors and conflicts as Warning
             _logger.LogWarning(
                 exception,
-                "Request rejected with status {StatusCode}",
-                statusCode);
+                "Request {Method} {Path} rejected with status {StatusCode}. TraceId: {TraceId}",
+                method,
+                path,
+                statusCode,
+                traceId);
         }
 
         var problem = new ProblemDetails
@@ -68,7 +80,7 @@ public class GlobalExceptionHandler : IExceptionHandler
             Detail = statusCode >= 500
                 ? "An unexpected error occurred. Please try again later."
                 : exception.Message,
-            Instance = httpContext.Request.Path
+            Instance = path.ToString()
         };
 
         httpContext.Response.StatusCode = statusCode;

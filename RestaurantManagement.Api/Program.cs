@@ -1,4 +1,5 @@
 
+using System.Diagnostics;
 using Microsoft.EntityFrameworkCore;
 using StackExchange.Redis;
 using RestaurantManagement.Application.Interfaces;
@@ -10,7 +11,7 @@ using RestaurantManagement.Api.Exceptions;
 using Microsoft.AspNetCore.RateLimiting;
 using System.Threading.RateLimiting;
 
-var builder = WebApplication.CreateBuilder(args); // config logging DI setup
+var builder = WebApplication.CreateBuilder(args);
 
 // Register API controllers
 builder.Services.AddControllers();
@@ -31,20 +32,16 @@ builder.Services.AddSingleton<IConnectionMultiplexer>(sp =>
     return ConnectionMultiplexer.Connect(connectionString);
 });
 
-
 // Configure API rate limiting
 builder.Services.AddRateLimiter(options =>
 {
-    // Return HTTP 429 when the limit is exceeded
     options.RejectionStatusCode =
         StatusCodes.Status429TooManyRequests;
 
-    // Apply the limit to every API request
     options.GlobalLimiter =
         PartitionedRateLimiter.Create<HttpContext, string>(
             context =>
             {
-                // Identify the client by IP address
                 var clientIp = context.Connection.RemoteIpAddress?
                     .ToString() ?? "unknown";
 
@@ -60,7 +57,7 @@ builder.Services.AddRateLimiter(options =>
             });
 });
 
-
+// Register Redis cache
 builder.Services.AddScoped<
     IRestaurantCache,
     RedisRestaurantCache>();
@@ -75,17 +72,43 @@ builder.Services.AddScoped<
     IRestaurantService,
     RestaurantService>();
 
-builder.Services.AddProblemDetails(); // Standardised error response (like status codes etc.)
+// Standardized error responses
+builder.Services.AddProblemDetails();
 
-builder.Services.AddExceptionHandler<GlobalExceptionHandler>(); // Custom exception handler registered
+// Register global exception handler
+builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
 
 var app = builder.Build();
 
-app.UseExceptionHandler(); // Enables exception middleware
+// Log every HTTP request and response
+app.Use(async (context, next) =>
+{
+    var stopwatch = Stopwatch.StartNew();
+
+    try
+    {
+        await next(context);
+    }
+    finally
+    {
+        stopwatch.Stop();
+
+        app.Logger.LogInformation(
+            "HTTP {Method} {Path} responded {StatusCode} in {ElapsedMs} ms. TraceId: {TraceId}",
+            context.Request.Method,
+            context.Request.Path,
+            context.Response.StatusCode,
+            stopwatch.Elapsed.TotalMilliseconds,
+            context.TraceIdentifier);
+    }
+});
+
+// Enable centralized exception handling
+app.UseExceptionHandler();
 
 app.UseHttpsRedirection();
 
-// Enable rate limiting middleware
+// Enable rate limiting
 app.UseRateLimiter();
 
 app.MapControllers();
